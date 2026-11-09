@@ -44,6 +44,7 @@ func main() {
 	server := flag.String("server", "golspk", "command line of the LSP server to measure")
 	memory := flag.Bool("memory", false, "also report the memory of the server after it has been idle for -settle")
 	settle := flag.Duration("settle", 6*time.Second, "how long to wait before measuring memory")
+	watcher := flag.Bool("watcher", true, "declare that the client watches files for the server, as editors do; set it to false to act as an agent that does not")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: golspk-bench [flags] ROOT_DIR FILE LINE COL")
 		flag.PrintDefaults()
@@ -53,13 +54,13 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	if err := run(*server, *memory, *settle, flag.Args()); err != nil {
+	if err := run(*server, *memory, *settle, *watcher, flag.Args()); err != nil {
 		fmt.Fprintln(os.Stderr, "golspk-bench:", err)
 		os.Exit(1)
 	}
 }
 
-func run(server string, memory bool, settle time.Duration, args []string) error {
+func run(server string, memory bool, settle time.Duration, watcher bool, args []string) error {
 	root, err := filepath.Abs(args[0])
 	if err != nil {
 		return err
@@ -124,7 +125,11 @@ func run(server string, memory bool, settle time.Duration, args []string) error 
 		"rootUri":          rootURI,
 		"workspaceFolders": []map[string]any{{"uri": rootURI, "name": filepath.Base(root)}},
 		"capabilities": map[string]any{
-			"workspace":    map[string]any{"workspaceFolders": true, "configuration": true},
+			"workspace": map[string]any{
+				"workspaceFolders":      true,
+				"configuration":         true,
+				"didChangeWatchedFiles": map[string]any{"dynamicRegistration": watcher},
+			},
 			"textDocument": map[string]any{"hover": map[string]any{"contentFormat": []string{"markdown", "plaintext"}}},
 		},
 	}, nil); err != nil {
