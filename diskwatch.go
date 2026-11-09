@@ -113,12 +113,18 @@ func (s *server) checkDisk() {
 			}
 		case stamp == e.stamp:
 		case e.names != nil:
-			// A removed file is reported by its own record, so only look for added files.
+			// A removed file that golspk has read is also reported by its own record, which does no harm.
+			// This finds the removal of a file that golspk has not read, such as a test file of a package loaded without tests.
 			e.stamp = stamp
 			names := goFileNames(path)
 			for name := range names {
 				if !e.names[name] {
 					changes = append(changes, change{filepath.Join(path, name), 1})
+				}
+			}
+			for name := range e.names {
+				if !names[name] {
+					changes = append(changes, change{filepath.Join(path, name), 3})
 				}
 			}
 			e.names = names
