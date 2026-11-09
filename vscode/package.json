@@ -84,6 +84,7 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "node -e \"require('node:fs').copyFileSync('../README.md', 'README.md')\"",
     "build-go": "cd .. && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o vscode/bin/golspk .",
     "package": "npm run build-go && vsce package --target darwin-arm64",
     "test": "node test/l10n-check.js && npm run build-go && node test/run.js --fixture"
