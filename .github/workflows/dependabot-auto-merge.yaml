@@ -1,0 +1,34 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dependabot/fetch-metadata@v3.1.0
+        id: metadata
+      # A merge with GITHUB_TOKEN does not start the CI on main, so a GitHub App token enables auto-merge.
+      # Updates of GitHub Actions change workflow files, which needs the workflows permission.
+      - uses: actions/create-github-app-token@v3.3.0
+        id: token
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' || steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        with:
+          client-id: ${{ secrets.BOT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      - if: steps.token.outcome == 'success'
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}

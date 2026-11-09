@@ -67,10 +67,22 @@ jobs:
       - run: npm ci
       - run: xvfb-run -a npm test
 
-  build:
-    if: github.event_name == 'push'
+  # A single check for rulesets to require, because the names of matrix jobs change with the matrix.
+  # A skipped job counts as passed for a required check, so this job fails unless every job succeeded.
+  ci-passed:
+    if: always()
     needs:
       - lint-go
       - test-go
       - test-vscode
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "$FAILED" = false
+        env:
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+
+  build:
+    if: github.event_name == 'push'
+    needs:
+      - ci-passed
     uses: ./.github/workflows/build.yaml
