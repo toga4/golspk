@@ -7,12 +7,14 @@ import (
 	"time"
 )
 
-// trimDelay is the time without requests after which golspk drops what open files do not need.
-const trimDelay = 2 * time.Minute
+// defaultTrimAfter is the time without requests after which golspk drops what open files do not need,
+// unless the client sets trimAfterMinutes.
+const defaultTrimAfter = 2 * time.Minute
 
-// unloadDelay is the time without requests after which golspk drops everything it has loaded, including what open files need.
+// defaultUnloadAfter is the time without requests after which golspk drops everything it has loaded, including what open files need,
+// unless the client sets unloadAfterMinutes.
 // An agent session waits for its user most of the time, and several sessions each run their own server.
-const unloadDelay = 10 * time.Minute
+const defaultUnloadAfter = 10 * time.Minute
 
 // unload drops everything loaded, so that an idle server holds little memory.
 // The next request loads the packages it needs again, reading the type information saved on disk where it can.

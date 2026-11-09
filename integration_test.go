@@ -567,6 +567,29 @@ func TestUnload(t *testing.T) {
 	equal(t, "symbols after unload", s.symbols("NewBase"), []string{"NewBase"})
 }
 
+// TestIdleSettings checks that the client sets the time without requests before trim and unload, and turns them off with zero.
+func TestIdleSettings(t *testing.T) {
+	s := startSession(t, map[string]any{"trimAfterMinutes": 0.001, "unloadAfterMinutes": 0.002})
+	s.open("d/d.go")
+	newBase := s.at("d/d.go", "NewBase(", 1)
+	equal(t, "definition", s.locations("textDocument/definition", newBase), []string{"a/a.go:16"})
+	deadline := time.Now().Add(10 * time.Second)
+	for len(s.loadedModules()) > 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	equal(t, "modules after the delays", s.loadedModules(), nil)
+	equal(t, "definition after unload", s.locations("textDocument/definition", newBase), []string{"a/a.go:16"})
+
+	s.notify("golspk/setOptions", map[string]any{"trimAfterMinutes": 0, "unloadAfterMinutes": 0})
+	s.locations("textDocument/definition", newBase)
+	s.srv.mu.Lock()
+	trim, unload := s.srv.trimTimer, s.srv.unloadTimer
+	s.srv.mu.Unlock()
+	if trim != nil || unload != nil {
+		t.Errorf("timers after turning trim and unload off: trim %v, unload %v", trim != nil, unload != nil)
+	}
+}
+
 // loadedModules returns the roots of the modules the server has loaded.
 func (s *session) loadedModules() []string {
 	s.srv.mu.Lock()

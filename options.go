@@ -4,16 +4,34 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
 )
 
-// options holds the search settings that the client can change.
+// options holds the settings that the client can change.
 type options struct {
 	// Exclude lists doublestar globs of paths to leave out of searches. They match paths relative to a workspace folder.
 	Exclude []string `json:"exclude"`
 	// ExcludeTests reports whether searches leave out _test.go files.
 	ExcludeTests bool `json:"excludeTests"`
+	// TrimAfterMinutes is the time without requests after which the server drops what open files do not need.
+	// Nil means defaultTrimAfter, and zero or less turns trimming off.
+	TrimAfterMinutes *float64 `json:"trimAfterMinutes"`
+	// UnloadAfterMinutes is the time without requests after which the server drops everything it has loaded.
+	// Nil means defaultUnloadAfter, and zero or less turns unloading off.
+	UnloadAfterMinutes *float64 `json:"unloadAfterMinutes"`
+}
+
+// idleDelay returns the delay that minutes sets, or def when minutes is nil. It returns zero when minutes turns the work off.
+func idleDelay(minutes *float64, def time.Duration) time.Duration {
+	if minutes == nil {
+		return def
+	}
+	if *minutes <= 0 {
+		return 0
+	}
+	return time.Duration(*minutes * float64(time.Minute))
 }
 
 // setOptions stores the settings carried by initializationOptions of initialize or by a golspk/setOptions notification.
@@ -34,7 +52,10 @@ func (s *server) setOptions(raw json.RawMessage) {
 	s.mu.Lock()
 	s.opts = o
 	s.mu.Unlock()
-	logf("setOptions: exclude %q, excludeTests %v", o.Exclude, o.ExcludeTests)
+	logf("setOptions: exclude %q, excludeTests %v, trim after %v, unload after %v", o.Exclude, o.ExcludeTests,
+		idleDelay(o.TrimAfterMinutes, defaultTrimAfter), idleDelay(o.UnloadAfterMinutes, defaultUnloadAfter))
+	// Start the timers again, so that new delays apply without waiting for a request.
+	s.scheduleRelease()
 }
 
 // skipPath reports whether searches (references, implementations, hierarchies and symbols) leave out path.

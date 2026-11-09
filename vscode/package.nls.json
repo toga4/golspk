@@ -6,5 +6,7 @@
   "command.widenLastSearch": "golspk: Widen the Last Search to All Modules",
   "command.toggleExcludeTests": "golspk: Toggle Whether Searches Include Test Files",
   "config.serverPath": "Path to the golspk executable. When empty, the executable bundled with the extension is used.",
-  "config.exclude": "Globs of paths to leave out of searches for references, implementations, call and type hierarchies, and symbols. They match paths relative to a workspace folder and support `**`, `{a,b}` and `[a-z]`. A pattern that names a directory leaves out every file under it. Examples: `**/generated/**`, `internal/e2e`, `**/*_{gen,mock}.go`. Go to definition and hover are not affected."
+  "config.exclude": "Globs of paths to leave out of searches for references, implementations, call and type hierarchies, and symbols. They match paths relative to a workspace folder and support `**`, `{a,b}` and `[a-z]`. A pattern that names a directory leaves out every file under it. Examples: `**/generated/**`, `internal/e2e`, `**/*_{gen,mock}.go`. Go to definition and hover are not affected.",
+  "config.trimAfterMinutes": "Minutes without requests after which the server drops the type information that open files do not need, such as what a search across many packages loaded. A later search loads it again. 0 turns this off.",
+  "config.unloadAfterMinutes": "Minutes without requests after which the server drops everything it has loaded, including what open files need, to return the memory. The next request loads the packages it needs again, which takes about as long as the first request after opening a file. 0 turns this off."
 }

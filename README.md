@@ -81,6 +81,25 @@ When the workspace has several modules, find references and go to implementation
 - For a symbol declared in the standard library or a third-party module, golspk searches only the module of the open file, because almost every module uses such symbols and loading all of them takes long. The extension then shows a button on the status bar for 60 seconds that widens the search to all modules and shows the results in the peek view.
 - The commands "golspk: Find References in All Modules" and "golspk: Find Implementations in All Modules" in the editor context menu and the command palette run the wide search directly.
 
+## Memory
+
+golspk drops what it has loaded when no request arrives for a while, so that an idle server holds little memory.
+This matters when several editors or agent sessions each run their own server.
+
+- After `golspk.trimAfterMinutes` (2 by default), it keeps only the packages that open files need. It drops the rest, including the modules loaded only by searches, and a later search loads them again.
+- After `golspk.unloadAfterMinutes` (10 by default), it drops everything it has loaded. The next request loads the packages it needs again, which takes about as long as the first request after opening a file.
+
+Set either to 0 to turn it off.
+
+```json
+{
+  "golspk.trimAfterMinutes": 2,
+  "golspk.unloadAfterMinutes": 10
+}
+```
+
+Another client passes the same settings, and `exclude` and `excludeTests`, as `initializationOptions`, for example `{"trimAfterMinutes": 2, "unloadAfterMinutes": 10}`.
+
 ## How it works
 
 - When a file is opened, golspk loads the metadata of its package and dependencies with `go list -deps`. This neither type-checks nor compiles, so it finishes within a second even with more than 1,000 dependencies.
@@ -90,8 +109,7 @@ When the workspace has several modules, find references and go to implementation
 - Dependency versions differ between modules, so each module resolves packages on its own. Packages whose transitive dependencies have the same versions share the same type information between modules. Packages of the workspace are shared when the location and the modification time of their files are also the same.
 - When a file changes, the type information of its package and of the packages that depend on it is dropped. Type information that no module uses any more is dropped from the shared pool too.
 - Memory used for a short time by a search that type-checks many packages is returned to the OS when no request arrives for 3 seconds.
-- When no request arrives for 2 minutes, golspk keeps only the packages that open files need and drops the rest, including the modules loaded only by searches. A later search loads them again.
-- When no request arrives for 10 minutes, golspk drops everything it has loaded, so that an idle server, such as one started by an agent session waiting for its user, holds little memory. The next request loads the packages it needs again, which takes about as long as the first request after opening a file.
+- When no request arrives for a while, golspk drops what open files do not need, and later everything it has loaded. See [Memory](#memory).
 - Find references narrows candidate files with a text search over the sources of the module and type-checks only the candidate packages. A single search type-checks at most 400 packages per module and warns when it stops there.
 - Go to implementations looks at the candidate packages narrowed by a text search for method names and at the packages already loaded, which include the standard library and third-party modules.
 - Types are matched by method names and signature shapes instead of `types.Implements`. A type parameter matches any type, and named types are compared by package path and name. This matches generic types, types of packages rebuilt for tests and types loaded in other modules.

@@ -27,11 +27,14 @@ let testsButton;
 /** @type {vscode.ExtensionContext} */
 let extensionContext;
 
-/** Returns the search settings to pass to the server. Whether tests are excluded is remembered per workspace. */
+/** Returns the settings to pass to the server. Whether tests are excluded is remembered per workspace. */
 function currentOptions() {
+	const config = vscode.workspace.getConfiguration("golspk");
 	return {
-		exclude: vscode.workspace.getConfiguration("golspk").get("exclude") ?? [],
+		exclude: config.get("exclude") ?? [],
 		excludeTests: extensionContext.workspaceState.get(EXCLUDE_TESTS_KEY, false),
+		trimAfterMinutes: config.get("trimAfterMinutes"),
+		unloadAfterMinutes: config.get("unloadAfterMinutes"),
 	};
 }
 
@@ -142,7 +145,7 @@ async function activate(context) {
 			return next;
 		}),
 		vscode.workspace.onDidChangeConfiguration((e) => {
-			if (e.affectsConfiguration("golspk.exclude")) {
+			if (["golspk.exclude", "golspk.trimAfterMinutes", "golspk.unloadAfterMinutes"].some((key) => e.affectsConfiguration(key))) {
 				sendOptions();
 			}
 		}),

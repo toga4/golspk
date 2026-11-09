@@ -65,6 +65,18 @@
           },
           "default": [],
           "markdownDescription": "%config.exclude%"
+        },
+        "golspk.trimAfterMinutes": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "description": "%config.trimAfterMinutes%"
+        },
+        "golspk.unloadAfterMinutes": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "description": "%config.unloadAfterMinutes%"
         }
       }
     },

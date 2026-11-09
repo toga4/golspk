@@ -116,6 +116,7 @@ const releaseDelay = 3 * time.Second
 // scheduleRelease releases unused memory to the OS when no request arrives for releaseDelay.
 // A search that type-checks many packages uses a lot of memory for a short time,
 // and the Go runtime does not return it to the OS right away.
+// It also starts the timers of trim and unload again, with the delays the client has set.
 func (s *server) scheduleRelease() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -125,12 +126,18 @@ func (s *server) scheduleRelease() {
 	s.releaseTimer = time.AfterFunc(releaseDelay, debug.FreeOSMemory)
 	if s.trimTimer != nil {
 		s.trimTimer.Stop()
+		s.trimTimer = nil
 	}
-	s.trimTimer = time.AfterFunc(trimDelay, s.trim)
+	if d := idleDelay(s.opts.TrimAfterMinutes, defaultTrimAfter); d > 0 {
+		s.trimTimer = time.AfterFunc(d, s.trim)
+	}
 	if s.unloadTimer != nil {
 		s.unloadTimer.Stop()
+		s.unloadTimer = nil
 	}
-	s.unloadTimer = time.AfterFunc(unloadDelay, s.unload)
+	if d := idleDelay(s.opts.UnloadAfterMinutes, defaultUnloadAfter); d > 0 {
+		s.unloadTimer = time.AfterFunc(d, s.unload)
+	}
 }
 
 // memStats runs a garbage collection and returns the size of the live heap. It is used for measurements.
