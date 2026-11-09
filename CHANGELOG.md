@@ -1,0 +1,13 @@
+# Changelog
+
+## 0.1.0
+
+The first release.
+
+- Go to definition, go to type definition, and hover with the signature and the doc comment.
+- Go to implementations, including types that implement an interface through embedding, generic types and types in test files.
+- Find references, which also searches the other modules of the workspace.
+- Call hierarchy and type hierarchy.
+- Workspace symbols, outline, and highlight of the same identifier.
+- The setting `golspk.exclude` and the status bar button for test files, which narrow searches.
+- Messages in English and Japanese.

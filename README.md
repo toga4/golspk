@@ -111,6 +111,7 @@ go test ./... && cd vscode && npm test
 - `go test` starts the server in process against a temporary copy of `testdata/implmod` and checks the results of every request, including how the server follows changes on disk.
 - `npm test` checks the translations, builds the server and runs `vscode/test/run.js --fixture`, which launches VS Code with a separate user data directory and checks the same features through the extension.
 - `node vscode/test/run.js WORKSPACE_DIR FILE LINE COL` measures the time until go to definition and hover respond through the extension.
+- To release a version, add its section to `CHANGELOG.md`, set it in `vscode/package.json` and in `serverVersion` of `server.go`, and publish a GitHub release tagged `v` followed by the version. The Publish workflow checks that the versions match, publishes the extension to the Marketplace, attaches the packages to the release and takes the release notes from `CHANGELOG.md`.
 - `go run ./cmd/golspk-bench ROOT_DIR FILE LINE COL` measures the same over LSP directly, with the sequence initialize, didOpen, definition and hover. Pass `-server "gopls"` to compare against gopls, and `-memory` to report the memory of the server. RSS reported by `ps` on macOS includes memory already returned to the OS, so the command also reports the physical footprint, which is what Activity Monitor shows.
 
 ## License

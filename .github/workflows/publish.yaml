@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
-      # The tag, the extension and the server must carry the same version.
+      # The tag, the extension and the server must carry the same version, and CHANGELOG.md must describe it.
       - run: |
           extension="v$(jq -r .version vscode/package.json)"
           server="$(go run . version)"
@@ -29,6 +29,7 @@ jobs:
             echo "::error::The release tag $TAG does not match the extension version $extension or the server version \"$server\""
             exit 1
           fi
+          scripts/changelog-section.sh "${TAG#v}" > /dev/null
         env:
           TAG: ${{ github.event.release.tag_name }}
 
@@ -63,7 +64,10 @@ jobs:
       # Publishes with Marketplace Trusted Publishing, which exchanges the OIDC token of this job for a short-lived credential.
       - run: npx vsce publish --oidc --packagePath ../dist/*.vsix
         working-directory: vscode
-      - run: gh release upload "$TAG" dist/*.vsix
+      - run: |
+          gh release upload "$TAG" dist/*.vsix
+          scripts/changelog-section.sh "${TAG#v}" > notes.md
+          gh release edit "$TAG" --notes-file notes.md
         env:
           TAG: ${{ github.event.release.tag_name }}
           GH_TOKEN: ${{ github.token }}

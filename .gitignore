@@ -4,3 +4,4 @@ node_modules/
 .vscode-test/
 /golspk
 /vscode/README.md
+/vscode/CHANGELOG.md
