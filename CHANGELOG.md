@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The server notices changes on disk by itself for a client that does not watch files for it, such as an agent that edits files with its own tools.
+
 ## 0.1.1
 
 - The extension is bundled into a single file, so VS Code loads fewer files when it activates the extension.

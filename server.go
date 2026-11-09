@@ -13,6 +13,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -55,6 +56,10 @@ type server struct {
 	exportMu sync.Mutex
 
 	releaseTimer *time.Timer
+
+	// pollDisk reports whether the client does not watch files for the server, so that golspk checks the disk itself.
+	pollDisk atomic.Bool
+	disk     diskWatch
 }
 
 // sharedDepIfExists returns the holder of the package whose cacheKey is key, if there is one.
@@ -178,6 +183,7 @@ func newServer(c *conn) *server {
 		symbols:     &symbolIndex{files: map[string]*fileSymbols{}},
 		shared:      map[string]*depPkg{},
 		lang:        "en",
+		disk:        diskWatch{entries: map[string]*diskEntry{}},
 	}
 }
 
@@ -323,7 +329,9 @@ type textDocumentPositionParams struct {
 func (s *server) notify(req *request) {
 	switch req.Method {
 	case "initialized":
-		s.registerWatchers()
+		if !s.pollDisk.Load() {
+			s.registerWatchers()
+		}
 	case "golspk/setOptions":
 		s.setOptions(req.Params)
 	case "exit":
@@ -343,9 +351,13 @@ func (s *server) notify(req *request) {
 		if file == "" {
 			return
 		}
+		// A client that does not watch files opens a file after editing it on disk,
+		// so drop the results loaded from the content before the edit first.
+		s.checkDisk()
 		s.mu.Lock()
 		s.overlays[file] = &overlay{version: p.TextDocument.Version, text: []byte(p.TextDocument.Text)}
 		s.mu.Unlock()
+		s.recordFile(file)
 		if strings.HasSuffix(file, ".go") {
 			// Start type checking when the file is opened, so that the first go to definition or hover does not wait.
 			go func() {
@@ -484,6 +496,9 @@ func (s *server) filesChanged(each func(yield func(path string, kind int))) {
 
 func (s *server) handle(req *request) {
 	start := time.Now()
+	if req.Method != "initialize" && req.Method != "shutdown" {
+		s.checkDisk()
+	}
 	result, rerr := s.dispatch(req)
 	s.scheduleRelease()
 	if err := s.conn.reply(req.ID, result, rerr); err != nil {
@@ -501,11 +516,20 @@ func (s *server) dispatch(req *request) (any, *rpcError) {
 		var init struct {
 			Locale                string          `json:"locale"`
 			InitializationOptions json.RawMessage `json:"initializationOptions"`
+			Capabilities          struct {
+				Workspace struct {
+					DidChangeWatchedFiles struct {
+						DynamicRegistration bool `json:"dynamicRegistration"`
+					} `json:"didChangeWatchedFiles"`
+				} `json:"workspace"`
+			} `json:"capabilities"`
 		}
 		if json.Unmarshal(req.Params, &init) == nil {
 			s.setLocale(init.Locale)
 			s.setOptions(init.InitializationOptions)
 		}
+		// golspk asks the client to watch files with a registration, so a client that cannot accept it never reports changes on disk.
+		s.pollDisk.Store(!init.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration)
 		return map[string]any{
 			"capabilities": map[string]any{
 				"positionEncoding":          "utf-16",

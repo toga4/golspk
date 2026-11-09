@@ -137,8 +137,25 @@ func (v *view) loadMeta(file string) error {
 		return err
 	}
 	added := v.addMeta(pkgs)
+	v.recordMeta(pkgs)
 	logf("loadMeta %s: %d packages added in %v", file, added, time.Since(start))
 	return nil
+}
+
+// recordMeta records the module files of the view and the directories of the packages in pkgs whose files can change,
+// so that checkDisk notices files added to them and changes of the dependencies.
+func (v *view) recordMeta(pkgs []*packages.Package) {
+	if !v.s.pollDisk.Load() {
+		return
+	}
+	for _, name := range []string{"go.mod", "go.sum", "go.work"} {
+		v.s.recordNewFile(filepath.Join(v.root, name))
+	}
+	packages.Visit(pkgs, nil, func(p *packages.Package) {
+		if len(p.GoFiles) > 0 && !v.selfImmutable(p) {
+			v.s.recordDir(filepath.Dir(p.GoFiles[0]))
+		}
+	})
 }
 
 // addMeta adds the metadata of pkgs and their dependencies that the view does not have yet, and returns the number added.
@@ -505,13 +522,22 @@ func (v *view) parseFiles(m *packages.Package, full bool) ([]*ast.File, map[stri
 	var files []*ast.File
 	byName := map[string]*ast.File{}
 	mappers := map[string]*mapper{}
+	record := !v.selfImmutable(m)
 	for _, name := range m.CompiledGoFiles {
 		if !strings.HasSuffix(name, ".go") {
 			continue
 		}
+		_, open := v.s.overlayVersion(name)
+		stamp, stamped := "", false
+		if record && !open {
+			stamp, stamped = fileStamp(name)
+		}
 		src, err := v.s.readFile(name)
 		if err != nil {
 			continue
+		}
+		if stamped {
+			v.s.recordFileStamp(name, stamp)
 		}
 		f, _ := parser.ParseFile(v.s.fset, name, src, mode)
 		if f == nil {

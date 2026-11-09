@@ -42,8 +42,19 @@ type session struct {
 	notifications map[string][]json.RawMessage
 }
 
-// startSession copies testdata/implmod to a temporary directory and starts a server on it.
+// watchingClient is the capabilities of a client that watches files for the server, as VS Code does.
+var watchingClient = map[string]any{
+	"workspace": map[string]any{"didChangeWatchedFiles": map[string]any{"dynamicRegistration": true}},
+}
+
+// startSession copies testdata/implmod to a temporary directory and starts a server on it for a client that watches files.
 func startSession(t *testing.T, initializationOptions any) *session {
+	t.Helper()
+	return startSessionWithCapabilities(t, initializationOptions, watchingClient)
+}
+
+// startSessionWithCapabilities is startSession for a client with the capabilities.
+func startSessionWithCapabilities(t *testing.T, initializationOptions any, capabilities map[string]any) *session {
 	t.Helper()
 	// Resolve symlinks, because the temporary directory on macOS is one and go list reports resolved paths.
 	root, err := filepath.EvalSymlinks(t.TempDir())
@@ -63,6 +74,10 @@ func startSession(t *testing.T, initializationOptions any) *session {
 		s.notifications[method] = append(s.notifications[method], params)
 		s.mu.Unlock()
 	}
+	s.client.OnRequest = func(method string, params json.RawMessage) any {
+		s.client.OnNotification(method, params)
+		return nil
+	}
 	s.client.Start()
 	t.Cleanup(func() {
 		_ = clientWriter.Close()
@@ -70,7 +85,7 @@ func startSession(t *testing.T, initializationOptions any) *session {
 	})
 	s.call("initialize", map[string]any{
 		"rootUri":               pathToURI(root),
-		"capabilities":          map[string]any{},
+		"capabilities":          capabilities,
 		"initializationOptions": initializationOptions,
 	}, nil)
 	s.notify("initialized", map[string]any{})
@@ -113,24 +128,30 @@ func (s *session) open(rel string) {
 // write rewrites a file on disk, or removes it when content is empty, and sends the file watcher notification.
 func (s *session) write(rel, content string) {
 	s.t.Helper()
-	_, statErr := os.Stat(s.path(rel))
-	kind := 2
-	if content == "" {
-		kind = 3
-		if err := os.Remove(s.path(rel)); err != nil {
-			s.t.Fatal(err)
-		}
-	} else {
-		if statErr != nil {
-			kind = 1
-		}
-		if err := os.WriteFile(s.path(rel), []byte(content), 0o644); err != nil {
-			s.t.Fatal(err)
-		}
-	}
+	kind := s.writeSilently(rel, content)
 	s.notify("workspace/didChangeWatchedFiles", map[string]any{
 		"changes": []map[string]any{{"uri": pathToURI(s.path(rel)), "type": kind}},
 	})
+}
+
+// writeSilently rewrites a file on disk, or removes it when content is empty, without notifying the server.
+// It returns the FileChangeType of the change.
+func (s *session) writeSilently(rel, content string) int {
+	s.t.Helper()
+	_, statErr := os.Stat(s.path(rel))
+	if content == "" {
+		if err := os.Remove(s.path(rel)); err != nil {
+			s.t.Fatal(err)
+		}
+		return 3
+	}
+	if err := os.WriteFile(s.path(rel), []byte(content), 0o644); err != nil {
+		s.t.Fatal(err)
+	}
+	if statErr != nil {
+		return 1
+	}
+	return 2
 }
 
 // at returns the request parameters for the position delta characters after the start of needle in the file.
@@ -388,6 +409,9 @@ func TestSearchAllModules(t *testing.T) {
 func TestFollowsFileChanges(t *testing.T) {
 	s := startSession(t, nil)
 	s.open("d/d.go")
+	if got := s.received("client/registerCapability"); len(got) != 1 {
+		t.Errorf("registrations of the file watcher = %d, want 1", len(got))
+	}
 	newBase := s.at("d/d.go", "NewBase(", 1)
 	if hover := s.hover(newBase); !strings.Contains(hover, "name string") {
 		t.Fatalf("hover = %q", hover)
@@ -428,6 +452,38 @@ func TestFollowsFileChanges(t *testing.T) {
 	if hover := s.hover(newBase); !strings.Contains(hover, "name string") {
 		t.Errorf("hover after reverting a dependency = %q", hover)
 	}
+}
+
+// TestFollowsDiskChangesWithoutWatcher checks a client that never reports changes on disk, such as an agent that edits files with its own tools.
+func TestFollowsDiskChangesWithoutWatcher(t *testing.T) {
+	s := startSessionWithCapabilities(t, nil, map[string]any{})
+	if got := s.received("client/registerCapability"); len(got) != 0 {
+		t.Errorf("the server asked a client without dynamic registration to watch files: %s", got)
+	}
+	s.open("d/d.go")
+	newBase := s.at("d/d.go", "NewBase(", 1)
+	equal(t, "definition", s.locations("textDocument/definition", newBase), []string{"a/a.go:16"})
+	original := s.read("a/a.go")
+
+	// A file edited on disk and then opened, as the edit tool of an agent does.
+	edited := strings.Replace(original, "package a\n", "package a\n\n// line 1\n// line 2\n", 1)
+	s.writeSilently("a/a.go", edited)
+	s.open("a/a.go")
+	equal(t, "definition after an edit and an open", s.locations("textDocument/definition", newBase), []string{"a/a.go:19"})
+
+	// An open file edited on disk without any notification, as a shell command does.
+	s.writeSilently("a/a.go", strings.Replace(edited, "package a\n", "package a\n\n// line 3\n", 1))
+	equal(t, "definition after an edit of an open file", s.locations("textDocument/definition", newBase), []string{"a/a.go:21"})
+
+	// A file added on disk, and an open file edited on disk to use it.
+	s.writeSilently("a/added.go", "package a\n\n// Added is added while the server is running.\nfunc Added() string { return \"\" }\n")
+	equal(t, "symbol of an added file", s.symbols("Added"), []string{"Added"})
+	s.writeSilently("d/d.go", s.read("d/d.go")+"\nfunc callAdded() string { return a.Added() }\n")
+	equal(t, "definition in an added file", s.locations("textDocument/definition", s.at("d/d.go", "a.Added()", 2)), []string{"a/added.go:4"})
+
+	// A file removed from disk. The query also matches the function added to the open file.
+	s.writeSilently("a/added.go", "")
+	equal(t, "symbol of a removed file", s.symbols("Added"), []string{"callAdded"})
 }
 
 func TestResponseTime(t *testing.T) {

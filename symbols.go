@@ -395,9 +395,12 @@ func (s *server) workspaceSymbol(query string) []workspaceSymbol {
 	x.mu.Lock()
 	never, stale := x.synced.IsZero(), time.Since(x.synced) > time.Minute
 	x.mu.Unlock()
-	if never {
+	switch {
+	case never || s.pollDisk.Load():
+		// Without watcher notifications, only a rebuild finds the files changed on disk.
+		// It reads again only the files whose modification time or size changed.
 		x.sync(s)
-	} else if stale {
+	case stale:
 		// Rebuild in the background, so that the index does not stay stale when file watcher notifications are missed.
 		go x.sync(s)
 	}

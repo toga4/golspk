@@ -344,6 +344,7 @@ func (v *view) loadMetaFiles(files []string) {
 		return
 	}
 	added := v.addMeta(pkgs)
+	v.recordMeta(pkgs)
 	logf("loadMetaFiles: %d files in %d directories, %d packages added in %v", len(files), len(patterns), added, time.Since(start))
 }
 
