@@ -36,7 +36,7 @@ cd vscode && npm install && npm run package
 ```
 
 ```bash
-code --install-extension vscode/golspk-darwin-arm64-0.9.1.vsix
+code --install-extension vscode/golspk-darwin-arm64-0.1.0.vsix
 ```
 
 Turn off gopls of the Go extension (golang.go) in the VS Code settings.

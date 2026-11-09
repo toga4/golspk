@@ -16,6 +16,9 @@ import (
 	"time"
 )
 
+// serverVersion is the version of golspk. It matches the version of the extension.
+const serverVersion = "0.1.0"
+
 // logOutput is where logf writes. Tests replace it.
 var logOutput io.Writer = os.Stderr
 
@@ -180,7 +183,7 @@ func newServer(c *conn) *server {
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println("golspk v0.9.1")
+		fmt.Println("golspk v" + serverVersion)
 		return
 	}
 	s := newServer(newConn(os.Stdin, os.Stdout))
@@ -518,7 +521,7 @@ func (s *server) dispatch(req *request) (any, *rpcError) {
 				"typeHierarchyProvider":     true,
 				"workspaceSymbolProvider":   true,
 			},
-			"serverInfo": map[string]any{"name": "golspk", "version": "0.9.1"},
+			"serverInfo": map[string]any{"name": "golspk", "version": serverVersion},
 		}, nil
 	case "shutdown":
 		return nil, nil
