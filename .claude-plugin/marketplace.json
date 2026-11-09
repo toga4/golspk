@@ -1,0 +1,14 @@
+{
+  "name": "golspk",
+  "owner": {
+    "name": "toga4"
+  },
+  "description": "golspk, a fast, read-only Go language server for reading code",
+  "plugins": [
+    {
+      "name": "golspk",
+      "source": "./claude-code",
+      "description": "Fast, read-only Go language server for reading code"
+    }
+  ]
+}

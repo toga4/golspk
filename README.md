@@ -56,6 +56,13 @@ To build the extension from source, run the following command. The packaging scr
 cd vscode && npm ci && npm run package
 ```
 
+To use golspk with Claude Code, install the server with `go install github.com/toga4/golspk@latest` and the plugin at the prompt of Claude Code.
+See [the plugin README](claude-code/README.md) for what changes from the gopls plugin, which shows Claude type errors after edits.
+
+```
+/plugin install golspk --marketplace toga4/golspk
+```
+
 To use the server with another editor, build it with `go build` and start `golspk` as an LSP server over standard input and output.
 golspk asks the editor to watch Go files and module files for it. When the client cannot accept the request, as with an agent that edits files with its own tools, golspk checks the modification times of the files it has read before each request.
 

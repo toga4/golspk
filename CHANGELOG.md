@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- A Claude Code plugin runs golspk as the Go language server of Claude Code.
+
 ## 0.2.0
 
 - The server notices changes on disk by itself for a client that does not watch files for it, such as an agent that edits files with its own tools.
