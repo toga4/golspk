@@ -1,0 +1,10 @@
+{
+  "description": "A fast, read-only Go language server for reading code: go to definition, hover, references and more, without loading the whole module first.",
+  "command.restart": "golspk: Restart Server",
+  "command.referencesAllModules": "golspk: Find References in All Modules",
+  "command.implementationsAllModules": "golspk: Find Implementations in All Modules",
+  "command.widenLastSearch": "golspk: Widen the Last Search to All Modules",
+  "command.toggleExcludeTests": "golspk: Toggle Whether Searches Include Test Files",
+  "config.serverPath": "Path to the golspk executable. When empty, the executable bundled with the extension is used.",
+  "config.exclude": "Globs of paths to leave out of searches for references, implementations, call and type hierarchies, and symbols. They match paths relative to a workspace folder and support `**`, `{a,b}` and `[a-z]`. A pattern that names a directory leaves out every file under it. Examples: `**/generated/**`, `internal/e2e`, `**/*_{gen,mock}.go`. Go to definition and hover are not affected."
+}

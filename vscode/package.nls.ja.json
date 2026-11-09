@@ -1,0 +1,10 @@
+{
+  "description": "コードを読むための、速くて読み取り専用の Go 言語サーバー。モジュール全体を先に読み込まずに、定義へ移動・ホバー・参照の検索などに応えます。",
+  "command.restart": "golspk: サーバーを再起動",
+  "command.referencesAllModules": "golspk: 全モジュールから参照を検索",
+  "command.implementationsAllModules": "golspk: 全モジュールから実装を検索",
+  "command.widenLastSearch": "golspk: 直前の検索を全モジュールへ広げる",
+  "command.toggleExcludeTests": "golspk: テストファイルを検索に含めるかを切り替える",
+  "config.serverPath": "golspk の実行ファイルのパス。空のときは、拡張に同梱した実行ファイルを使います。",
+  "config.exclude": "参照・実装・呼び出し階層・型階層・シンボルの検索から外すパスの glob。ワークスペースのフォルダからの相対パスに当てます。`**`・`{a,b}`・`[a-z]` を使えます。ディレクトリを指すパターンは、その下のすべてのファイルを外します。例: `**/generated/**`、`internal/e2e`、`**/*_{gen,mock}.go`。定義へ移動とホバーには影響しません。"
+}

@@ -1,0 +1,12 @@
+{
+  "$(beaker) Tests: excluded": "$(beaker) テスト: 除外",
+  "$(beaker) Tests: included": "$(beaker) テスト: 含む",
+  "Toggle whether golspk searches (references, implementations, call and type hierarchies, symbols) include _test.go files.": "golspk の参照・実装・呼び出し階層・型階層・シンボルの検索に、_test.go を含めるかを切り替えます。",
+  "$(search) Find references to {0} in all modules": "$(search) {0} の参照を全モジュールで検索",
+  "$(search) Find implementations of {0} in all modules": "$(search) {0} の実装を全モジュールで検索",
+  "golspk searched only the module of the open file. Click to search every module in the workspace.": "golspk は開いているファイルのモジュールだけを探しました。クリックすると、ワークスペースのすべてのモジュールを探します。",
+  "golspk: Finding references in all modules": "golspk: 全モジュールから参照を検索中",
+  "golspk: Finding implementations in all modules": "golspk: 全モジュールから実装を検索中",
+  "golspk: No references found": "golspk: 参照は見つかりませんでした",
+  "golspk: No implementations found": "golspk: 実装は見つかりませんでした"
+}
