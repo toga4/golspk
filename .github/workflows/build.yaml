@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: darwin-arm64
+            goos: darwin
+            goarch: arm64
+          - target: darwin-x64
+            goos: darwin
+            goarch: amd64
+          - target: linux-arm64
+            goos: linux
+            goarch: arm64
+          - target: linux-x64
+            goos: linux
+            goarch: amd64
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vscode
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - run: npm ci
+      - run: npm run build-go
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+      - run: npx vsce package --target "$TARGET"
+        env:
+          TARGET: ${{ matrix.target }}
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: golspk-${{ matrix.target }}
+          path: vscode/*.vsix
+          if-no-files-found: error
