@@ -89,10 +89,10 @@
     "test": "node test/l10n-check.js && npm run build-go && node test/run.js --fixture"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^11.0.0"
   },
   "devDependencies": {
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.1"
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0"
   }
 }
