@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- The extension is bundled into a single file, so VS Code loads fewer files when it activates the extension.
+- The README describes how to install the extension from the Marketplace.
+
 ## 0.1.0
 
 The first release.

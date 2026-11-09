@@ -17,7 +17,7 @@ import (
 )
 
 // serverVersion is the version of golspk. It matches the version of the extension.
-const serverVersion = "0.1.0"
+const serverVersion = "0.1.1"
 
 // logOutput is where logf writes. Tests replace it.
 var logOutput io.Writer = os.Stderr
