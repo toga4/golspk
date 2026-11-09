@@ -1,2 +1,4 @@
 test/**
 .vscode-test/**
+node_modules/**
+extension.js

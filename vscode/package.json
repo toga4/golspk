@@ -25,7 +25,7 @@
   "activationEvents": [
     "onLanguage:go"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
   "l10n": "./l10n",
   "contributes": {
     "commands": [
@@ -84,16 +84,16 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "node -e \"for (const f of ['README.md', 'CHANGELOG.md']) require('node:fs').copyFileSync('../' + f, f)\"",
+    "vscode:prepublish": "node -e \"for (const f of ['README.md', 'CHANGELOG.md']) require('node:fs').copyFileSync('../' + f, f)\" && npm run bundle",
+    "bundle": "esbuild extension.js --bundle --platform=node --format=cjs --external:vscode --minify --outfile=dist/extension.js",
     "build-go": "cd .. && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o vscode/bin/golspk .",
-    "package": "npm run build-go && vsce package --target darwin-arm64",
-    "test": "node test/l10n-check.js && npm run build-go && node test/run.js --fixture"
-  },
-  "dependencies": {
-    "vscode-languageclient": "^11.0.0"
+    "package": "npm run build-go && vsce package --no-dependencies --target darwin-arm64",
+    "test": "node test/l10n-check.js && npm run build-go && npm run bundle && node test/run.js --fixture"
   },
   "devDependencies": {
     "@vscode/test-electron": "^3.1.0",
-    "@vscode/vsce": "^4.1.0"
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "vscode-languageclient": "^11.0.0"
   }
 }

@@ -44,7 +44,7 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-      - run: npx vsce package --target "$TARGET"
+      - run: npx vsce package --no-dependencies --target "$TARGET"
         env:
           TARGET: ${{ matrix.target }}
       - uses: actions/upload-artifact@v7.0.2
