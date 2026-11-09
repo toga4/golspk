@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"go/token"
 	"io"
 	"maps"
 	"os"
@@ -531,6 +532,39 @@ func TestTrim(t *testing.T) {
 	equal(t, "references after trim", s.locations("golspk/references", errorsNew), refs)
 	s.open("a/a.go")
 	equal(t, "implementations after trim", s.locations("textDocument/implementation", runner), impls)
+}
+
+// TestUnload checks that the server answers again after dropping everything, and still follows changes on disk to open files.
+func TestUnload(t *testing.T) {
+	s := startSessionWithCapabilities(t, nil, map[string]any{})
+	s.open("d/d.go")
+	newBase := s.at("d/d.go", "NewBase(", 1)
+	equal(t, "definition before unload", s.locations("textDocument/definition", newBase), []string{"a/a.go:16"})
+	equal(t, "symbols before unload", s.symbols("NewBase"), []string{"NewBase"})
+
+	s.srv.unload()
+	equal(t, "modules after unload", s.loadedModules(), nil)
+	s.srv.sharedMu.Lock()
+	if n := len(s.srv.shared); n != 0 {
+		t.Errorf("shared packages after unload = %d, want 0", n)
+	}
+	s.srv.sharedMu.Unlock()
+	files := 0
+	s.srv.fset.Iterate(func(*token.File) bool {
+		files++
+		return true
+	})
+	if files != 0 {
+		t.Errorf("files in the file set after unload = %d, want 0", files)
+	}
+
+	// The open file changes on disk while nothing is loaded. The server must not keep answering from the content sent when it was opened.
+	s.writeSilently("d/d.go", "// A line added at the top.\n"+s.read("d/d.go"))
+	equal(t, "definition after unload and an edit of the open file", s.locations("textDocument/definition", s.at("d/d.go", "NewBase(", 1)), []string{"a/a.go:16"})
+	if hover := s.hover(s.at("d/d.go", "NewBase(", 1)); !strings.Contains(hover, "name string") {
+		t.Errorf("hover after unload = %q", hover)
+	}
+	equal(t, "symbols after unload", s.symbols("NewBase"), []string{"NewBase"})
 }
 
 // loadedModules returns the roots of the modules the server has loaded.

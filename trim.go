@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go/token"
 	"path/filepath"
 	"runtime/debug"
 	"time"
@@ -8,6 +9,48 @@ import (
 
 // trimDelay is the time without requests after which golspk drops what open files do not need.
 const trimDelay = 2 * time.Minute
+
+// unloadDelay is the time without requests after which golspk drops everything it has loaded, including what open files need.
+// An agent session waits for its user most of the time, and several sessions each run their own server.
+const unloadDelay = 10 * time.Minute
+
+// unload drops everything loaded, so that an idle server holds little memory.
+// The next request loads the packages it needs again, reading the type information saved on disk where it can.
+func (s *server) unload() {
+	if s.inflight.Load() > 0 {
+		// The end of the running work schedules the next unload.
+		return
+	}
+	start := time.Now()
+	s.mu.Lock()
+	open := make([]string, 0, len(s.opened))
+	for f := range s.opened {
+		open = append(open, f)
+	}
+	n := len(s.views)
+	s.views = map[string]*view{}
+	s.moduleScans = map[string]moduleScan{}
+	s.parsed = map[string]*parsedFile{}
+	s.retried = map[string]string{}
+	s.mu.Unlock()
+	s.sharedMu.Lock()
+	s.shared = map[string]*depPkg{}
+	s.sharedMu.Unlock()
+	s.symbols.reset()
+	// No type information refers to the positions in the parsed files any more, so drop their line tables too.
+	// Otherwise the file set grows each time the packages are loaded again.
+	var files []*token.File
+	s.fset.Iterate(func(f *token.File) bool {
+		files = append(files, f)
+		return true
+	})
+	for _, f := range files {
+		s.fset.RemoveFile(f)
+	}
+	s.pruneDisk(open)
+	logf("unload: dropped %d modules and %d files in %v", n, len(files), time.Since(start))
+	debug.FreeOSMemory()
+}
 
 // trim drops the packages that no open file needs, such as those loaded by a search that spans many packages,
 // and the modules that have no open file. Go to definition and hover in open files keep working without loading again.

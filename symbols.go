@@ -142,6 +142,16 @@ func (x *symbolIndex) update(path string) {
 	x.mu.Unlock()
 }
 
+// reset empties the index. The next search builds it again.
+func (x *symbolIndex) reset() {
+	x.syncMu.Lock()
+	defer x.syncMu.Unlock()
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	x.files = map[string]*fileSymbols{}
+	x.synced = time.Time{}
+}
+
 // built reports whether the index has been built at least once.
 func (x *symbolIndex) built() bool {
 	x.mu.Lock()

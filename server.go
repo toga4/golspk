@@ -57,13 +57,15 @@ type server struct {
 
 	releaseTimer *time.Timer
 	trimTimer    *time.Timer
+	unloadTimer  *time.Timer
 	// opened are the files the client has opened and not closed. trim keeps what they need.
 	opened map[string]bool
 
 	// pollDisk reports whether the client does not watch files for the server, so that golspk checks the disk itself.
 	pollDisk atomic.Bool
 	disk     diskWatch
-	// inflight is the number of requests being handled. trim waits until it is zero.
+	// inflight is the number of requests being handled and of files being loaded ahead of requests.
+	// trim and unload wait until it is zero.
 	inflight atomic.Int32
 }
 
@@ -125,6 +127,10 @@ func (s *server) scheduleRelease() {
 		s.trimTimer.Stop()
 	}
 	s.trimTimer = time.AfterFunc(trimDelay, s.trim)
+	if s.unloadTimer != nil {
+		s.unloadTimer.Stop()
+	}
+	s.unloadTimer = time.AfterFunc(unloadDelay, s.unload)
 }
 
 // memStats runs a garbage collection and returns the size of the live heap. It is used for measurements.
@@ -371,7 +377,11 @@ func (s *server) notify(req *request) {
 		s.recordFile(file)
 		if strings.HasSuffix(file, ".go") {
 			// Start type checking when the file is opened, so that the first go to definition or hover does not wait.
+			s.inflight.Add(1)
 			go func() {
+				defer s.inflight.Add(-1)
+				// An agent opens each file it edits, so loading ahead also counts as activity for trim and unload.
+				defer s.scheduleRelease()
 				if _, err := s.packageFor(file); err != nil {
 					logf("didOpen %s: %v", file, err)
 				}
