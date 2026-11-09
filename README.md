@@ -29,15 +29,14 @@ The messages of the server and the extension are available in English and Japane
 
 ## Install
 
-The extension is not published to the Marketplace yet. Build it from source. The packaging script builds for macOS on Apple silicon.
+Install [golspk](https://marketplace.visualstudio.com/items?itemName=toga4.golspk) from the Visual Studio Marketplace, or run the following command.
 
 ```bash
-cd vscode && npm install && npm run package
+code --install-extension toga4.golspk
 ```
 
-```bash
-code --install-extension vscode/golspk-darwin-arm64-0.1.0.vsix
-```
+The extension is available for macOS and Linux on x64 and arm64. Each [release](https://github.com/toga4/golspk/releases) also has the packages attached.
+The server runs the `go` command to load packages, so Go must be installed.
 
 Turn off gopls of the Go extension (golang.go) in the VS Code settings.
 VS Code waits for the responses of every registered language server before it goes to a definition.
@@ -49,6 +48,12 @@ Its test runner and debugger keep working.
 {
   "go.useLanguageServer": false
 }
+```
+
+To build the extension from source, run the following command. The packaging script builds for macOS on Apple silicon.
+
+```bash
+cd vscode && npm ci && npm run package
 ```
 
 To use the server with another editor, build it with `go build` and start `golspk` as an LSP server over standard input and output.
