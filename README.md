@@ -116,7 +116,7 @@ Another client passes the same settings, and `exclude` and `excludeTests`, as `i
 - Types that get their methods only through struct embedding are found by searching again for files that contain the name of the interface or of a type found so far, up to 64 names.
 - Incoming calls of the call hierarchy group the results of find references by the enclosing function. Outgoing calls come from the call expressions in the function body.
 - Workspace symbols come from an index built by scanning every Go file in the workspace with the Go scanner, without type checking. The index is built on the first search and updated from file watcher notifications. It covers package-level functions, types, variables, constants and methods, but not struct fields.
-- Changes on disk arrive through `workspace/didChangeWatchedFiles`. For a client that cannot register the file watcher, golspk records the modification time and size of each workspace file it reads and the Go files of each package directory, compares them with the disk before each request, and rebuilds the symbol index on each workspace symbol search. A changed file also replaces the content the client sent when it opened the file, because such a client does not report its later edits.
+- Changes on disk arrive through `workspace/didChangeWatchedFiles`. For a client that cannot register the file watcher, golspk records the modification time and size of each workspace file it reads and the Go files of each package directory, compares them with the disk before each request, and rebuilds the symbol index on each workspace symbol search. A changed file also replaces the content the client sent for it, because such a client does not report edits made by other tools, such as shell commands.
 
 ## Limitations
 
