@@ -3,6 +3,7 @@
 ## Unreleased
 
 - The server notices changes on disk by itself for a client that does not watch files for it, such as an agent that edits files with its own tools.
+- After 2 minutes without requests, the server drops the packages that open files do not need, such as those loaded by a search across many packages.
 
 ## 0.1.1
 

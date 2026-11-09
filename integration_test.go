@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -37,6 +38,7 @@ type session struct {
 	t      *testing.T
 	root   string
 	client *lspclient.Client
+	srv    *server
 
 	mu            sync.Mutex
 	notifications map[string][]json.RawMessage
@@ -68,7 +70,7 @@ func startSessionWithCapabilities(t *testing.T, initializationOptions any, capab
 	serverReader, clientWriter := io.Pipe()
 	srv := newServer(newConn(serverReader, serverWriter))
 	go func() { _ = srv.run() }()
-	s := &session{t: t, root: root, client: lspclient.New(clientReader, clientWriter), notifications: map[string][]json.RawMessage{}}
+	s := &session{t: t, root: root, client: lspclient.New(clientReader, clientWriter), srv: srv, notifications: map[string][]json.RawMessage{}}
 	s.client.OnNotification = func(method string, params json.RawMessage) {
 		s.mu.Lock()
 		s.notifications[method] = append(s.notifications[method], params)
@@ -484,6 +486,58 @@ func TestFollowsDiskChangesWithoutWatcher(t *testing.T) {
 	// A file removed from disk. The query also matches the function added to the open file.
 	s.writeSilently("a/added.go", "")
 	equal(t, "symbol of a removed file", s.symbols("Added"), []string{"callAdded"})
+}
+
+// TestTrim checks that dropping what open files do not need keeps their features working and loads the rest again when needed.
+func TestTrim(t *testing.T) {
+	s := startSessionWithCapabilities(t, nil, map[string]any{})
+	s.open("d/d.go")
+	newBase := s.at("d/d.go", "NewBase(", 1)
+	errorsNew := s.at("d/d.go", "errors.New(", 8)
+	refs := s.locations("golspk/references", errorsNew)
+	equal(t, "references in all modules", refs, []string{"d/d.go:10", "other/other.go:7"})
+	if n := len(s.loadedModules()); n != 2 {
+		t.Fatalf("modules loaded by the search = %d, want 2", n)
+	}
+	// A search for implementations loads the packages of the implementations, which d/d.go does not need.
+	s.open("a/a.go")
+	runner := s.at("a/a.go", "Runner interface", 1)
+	impls := s.locations("textDocument/implementation", runner)
+	if len(impls) < 3 {
+		t.Fatalf("implementations of Runner = %v, want those in other packages too", impls)
+	}
+	s.notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": pathToURI(s.path("a/a.go"))}})
+
+	s.srv.trim()
+	equal(t, "modules after trim", s.loadedModules(), []string{s.root})
+	v := s.srv.viewByRoot(s.root)
+	v.mu.Lock()
+	for id := range v.meta {
+		if strings.HasPrefix(id, "example.com/") && id != "example.com/implmod/d" && id != "example.com/implmod/a" {
+			t.Errorf("package %s is kept after trim, but d/d.go does not need it", id)
+		}
+	}
+	v.mu.Unlock()
+	s.srv.disk.mu.Lock()
+	for path := range s.srv.disk.entries {
+		rel, _ := filepath.Rel(s.root, path)
+		if dir := strings.Split(rel, string(filepath.Separator))[0]; dir != "a" && dir != "d" && !strings.HasPrefix(dir, "go.") {
+			t.Errorf("%s is still checked on disk after trim", rel)
+		}
+	}
+	s.srv.disk.mu.Unlock()
+
+	equal(t, "definition after trim", s.locations("textDocument/definition", newBase), []string{"a/a.go:16"})
+	equal(t, "references after trim", s.locations("golspk/references", errorsNew), refs)
+	s.open("a/a.go")
+	equal(t, "implementations after trim", s.locations("textDocument/implementation", runner), impls)
+}
+
+// loadedModules returns the roots of the modules the server has loaded.
+func (s *session) loadedModules() []string {
+	s.srv.mu.Lock()
+	defer s.srv.mu.Unlock()
+	return slices.Sorted(maps.Keys(s.srv.views))
 }
 
 func TestResponseTime(t *testing.T) {

@@ -195,6 +195,11 @@ func contains(list []string, s string) bool {
 func (v *view) pickID(file string) string {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	return v.pickIDLocked(file)
+}
+
+// pickIDLocked is pickID for a caller that holds v.mu.
+func (v *view) pickIDLocked(file string) string {
 	best := ""
 	for _, id := range v.fileIDs[file] {
 		p := v.meta[id]

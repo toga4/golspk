@@ -56,10 +56,15 @@ type server struct {
 	exportMu sync.Mutex
 
 	releaseTimer *time.Timer
+	trimTimer    *time.Timer
+	// opened are the files the client has opened and not closed. trim keeps what they need.
+	opened map[string]bool
 
 	// pollDisk reports whether the client does not watch files for the server, so that golspk checks the disk itself.
 	pollDisk atomic.Bool
 	disk     diskWatch
+	// inflight is the number of requests being handled. trim waits until it is zero.
+	inflight atomic.Int32
 }
 
 // sharedDepIfExists returns the holder of the package whose cacheKey is key, if there is one.
@@ -116,6 +121,10 @@ func (s *server) scheduleRelease() {
 		s.releaseTimer.Stop()
 	}
 	s.releaseTimer = time.AfterFunc(releaseDelay, debug.FreeOSMemory)
+	if s.trimTimer != nil {
+		s.trimTimer.Stop()
+	}
+	s.trimTimer = time.AfterFunc(trimDelay, s.trim)
 }
 
 // memStats runs a garbage collection and returns the size of the live heap. It is used for measurements.
@@ -147,7 +156,7 @@ func (s *server) sharedDep(key string, mutable bool) (*depPkg, bool) {
 
 // sweepShared drops from the shared pool the type information of the mutable packages that no view uses.
 // The key changes when a file changes, and the type information under the old key would otherwise stay forever.
-func (s *server) sweepShared() {
+func (s *server) sweepShared(all bool) {
 	s.mu.Lock()
 	views := make([]*view, 0, len(s.views))
 	for _, v := range s.views {
@@ -165,7 +174,7 @@ func (s *server) sweepShared() {
 	s.sharedMu.Lock()
 	defer s.sharedMu.Unlock()
 	for key, d := range s.shared {
-		if d.mutable && !used[d] {
+		if (all || d.mutable) && !used[d] {
 			delete(s.shared, key)
 		}
 	}
@@ -184,6 +193,7 @@ func newServer(c *conn) *server {
 		shared:      map[string]*depPkg{},
 		lang:        "en",
 		disk:        diskWatch{entries: map[string]*diskEntry{}},
+		opened:      map[string]bool{},
 	}
 }
 
@@ -356,6 +366,7 @@ func (s *server) notify(req *request) {
 		s.checkDisk()
 		s.mu.Lock()
 		s.overlays[file] = &overlay{version: p.TextDocument.Version, text: []byte(p.TextDocument.Text)}
+		s.opened[file] = true
 		s.mu.Unlock()
 		s.recordFile(file)
 		if strings.HasSuffix(file, ".go") {
@@ -393,6 +404,7 @@ func (s *server) notify(req *request) {
 		file := uriToPath(p.TextDocument.URI)
 		s.mu.Lock()
 		delete(s.overlays, file)
+		delete(s.opened, file)
 		s.mu.Unlock()
 		// Closing without saving reverts the content to the one on disk,
 		// so drop the type-checked results of the packages that depend on it.
@@ -478,7 +490,7 @@ func (s *server) filesChanged(each func(yield func(path string, kind int))) {
 		s.views = map[string]*view{}
 		s.moduleScans = map[string]moduleScan{}
 		s.mu.Unlock()
-		s.sweepShared()
+		s.sweepShared(false)
 		return
 	}
 	for v := range reset {
@@ -490,7 +502,7 @@ func (s *server) filesChanged(each func(yield func(path string, kind int))) {
 		}
 	}
 	if len(reset) > 0 || len(changed) > 0 {
-		s.sweepShared()
+		s.sweepShared(false)
 	}
 }
 
@@ -499,7 +511,9 @@ func (s *server) handle(req *request) {
 	if req.Method != "initialize" && req.Method != "shutdown" {
 		s.checkDisk()
 	}
+	s.inflight.Add(1)
 	result, rerr := s.dispatch(req)
+	s.inflight.Add(-1)
 	s.scheduleRelease()
 	if err := s.conn.reply(req.ID, result, rerr); err != nil {
 		logf("reply: %v", err)
